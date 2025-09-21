@@ -1,0 +1,81 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+enum ActionTokenKind {
+  EMAIL_VERIFICATION
+  PASSWORD_RESET
+  PASSWORD_RESET_CONFIRM
+}
+
+model User {
+  id            String   @id @default(cuid())
+  email         String   @unique
+  emailVerified Boolean  @default(false)
+  passwordHash  String
+  tokenVersion  Int      @default(0)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  // relations
+  actionTokens  ActionToken[]
+  refreshTokens RefreshToken[]
+}
+
+/**
+ * One-time tokens:
+ * - store only hash (never raw)
+ * - single table for email verification, password reset, etc.
+ * - optional metadata for flexibility
+ */
+model ActionToken {
+  id        String          @id @default(cuid())
+  userId    String
+  kind      ActionTokenKind
+  tokenHash String // SHA-256 of raw token
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime        @default(now())
+  metadata  Json?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, kind])
+  @@index([expiresAt])
+}
+
+/**
+ * Refresh tokens with rotation + reuse detection using a "family" (sessionId).
+ * Each issued refresh JWT gets its own row (by jti).
+ * - sessionId ties a device’s chain together
+ * - when rotating, mark old jti as revoked=true
+ */
+model RefreshToken {
+  jti          String    @id
+  userId       String
+  sessionId    String
+  tokenVersion Int
+  revoked      Boolean   @default(true)
+  revokedAt    DateTime?
+  createdAt    DateTime  @default(now())
+  lastUsedAt   DateTime?
+  expiresAt    DateTime
+  ip           String?
+  userAgent    String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, sessionId])
+  @@index([expiresAt])
+}
