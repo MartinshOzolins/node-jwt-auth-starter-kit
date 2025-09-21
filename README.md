@@ -24,3 +24,21 @@ Includes a full authentication flow with **sign-up, sign-in, email verification,
 git clone https://github.com/YOUR_USERNAME/node-jwt-auth-starter-kit.git
 cd node-jwt-auth-starter-kit
 npm install
+```
+
+### 2. Set up Prisma
+
+Generate the client and push the schema to your database:
+
+```bash
+npx prisma generate
+npx prisma db push
+```
+
+### 3. Run the server
+# Development 
+npm run dev
+
+# Build & run
+npm run build
+npm start
