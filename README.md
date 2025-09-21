@@ -36,9 +36,10 @@ npx prisma db push
 ```
 
 ### 3. Run the server
-# Development 
+
+#### Development 
 npm run dev
 
-# Build & run
+#### Build & run
 npm run build
 npm start
