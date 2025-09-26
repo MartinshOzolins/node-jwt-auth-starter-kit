@@ -26,6 +26,17 @@ cd node-jwt-auth-starter-kit
 npm install
 ```
 
+### 2. Set up environment variables
+
+Set up environment variables
+Copy the example environment file and update it with your own values:
+
+```bash
+cp .env.example .env
+```
+
+
+
 ### 2. Set up Prisma
 
 Generate the client and push the schema to your database:
