@@ -4,7 +4,7 @@ import { v4 as uuidv4 } from "uuid";
 
 const saltRounds = process.env.SALT_ROUNDS || 13;
 
-export const sha256 = (s: string) =>
+export const createSha256Hash = (s: string) =>
   createHash("sha256").update(s).digest("hex");
 
 /**

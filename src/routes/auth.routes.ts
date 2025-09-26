@@ -3,7 +3,7 @@ import { z } from "zod";
 import {
   createNewUUID,
   hashPassword,
-  sha256,
+  createSha256Hash,
   verifyPassword,
 } from "../utils/crypto.js";
 import { prisma } from "../utils/prisma.js";
@@ -61,7 +61,7 @@ router.post("/sign-up", async (req, res, next) => {
       data: {
         userId: user.id,
         kind: "EMAIL_VERIFICATION",
-        tokenHash: sha256(rawToken),
+        tokenHash: createSha256Hash(rawToken),
         expiresAt: new Date(Date.now() + 1000 * 60 * 60 * 24), // 24h
       },
     });
@@ -318,7 +318,7 @@ router.post("/verify-email", async (req, res) => {
   const row = await prisma.actionToken.findFirst({
     where: {
       kind: "EMAIL_VERIFICATION",
-      tokenHash: sha256(token),
+      tokenHash: createSha256Hash(token),
       usedAt: null,
       expiresAt: { gt: new Date() },
     },
@@ -378,7 +378,7 @@ router.post("/resend-verification", async (req, res) => {
     data: {
       userId: user.id,
       kind: "EMAIL_VERIFICATION",
-      tokenHash: sha256(raw),
+      tokenHash: createSha256Hash(raw),
       expiresAt: new Date(Date.now() + 1000 * 60 * 60 * 24), // 24h
     },
   });
@@ -416,7 +416,7 @@ router.post("/password-reset/request", async (req, res) => {
       data: {
         userId: user.id,
         kind: "PASSWORD_RESET",
-        tokenHash: sha256(raw),
+        tokenHash: createSha256Hash(raw),
         expiresAt: new Date(Date.now() + 1000 * 60 * 15), // 15m
       },
     });
@@ -443,7 +443,7 @@ router.post("/password-reset/verify", async (req, res) => {
   const row = await prisma.actionToken.findFirst({
     where: {
       kind: "PASSWORD_RESET",
-      tokenHash: sha256(token),
+      tokenHash: createSha256Hash(token),
       usedAt: null,
       expiresAt: { gt: new Date() },
     },
@@ -469,7 +469,7 @@ router.post("/password-reset/verify", async (req, res) => {
       data: {
         userId: row.userId,
         kind: "PASSWORD_RESET_CONFIRM",
-        tokenHash: sha256(confirmRaw),
+        tokenHash: createSha256Hash(confirmRaw),
         expiresAt: new Date(Date.now() + CONFIRM_TTL_MS),
       },
     }),
@@ -504,7 +504,7 @@ router.post("/password-reset/confirm", async (req, res, next) => {
     const row = await prisma.actionToken.findFirst({
       where: {
         kind: "PASSWORD_RESET_CONFIRM",
-        tokenHash: sha256(token),
+        tokenHash: createSha256Hash(token),
         usedAt: null,
         expiresAt: { gt: new Date() },
       },
