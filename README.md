@@ -37,7 +37,7 @@ cp .env.example .env
 
 
 
-### 2. Set up Prisma
+### 3. Set up Prisma
 
 Generate the client and push the schema to your database:
 
@@ -46,7 +46,7 @@ npx prisma generate
 npx prisma db push
 ```
 
-### 3. Run the server
+### 4. Run the server
 
 #### Development 
 ```bash
