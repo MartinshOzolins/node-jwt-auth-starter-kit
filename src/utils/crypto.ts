@@ -12,7 +12,7 @@ export const createSha256Hash = (s: string) =>
  * Hashes user password.
  */
 export async function hashPassword(password: string): Promise<string> {
-  const hashed = await bcrypt.hash(password, saltRounds);
+  const hashed = await bcrypt.hash(password, Number(saltRounds));
   return hashed;
 }
 

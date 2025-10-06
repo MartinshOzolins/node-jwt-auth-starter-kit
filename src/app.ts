@@ -18,6 +18,7 @@ const CORS_ORIGINS = (process.env.CORS_ORIGINS ?? "http://localhost:5173")
   .filter(Boolean);
 
 const app = express();
+console.log("NODE_ENV =", process.env.NODE_ENV);
 
 // security + infra middleware
 app.use(helmet());

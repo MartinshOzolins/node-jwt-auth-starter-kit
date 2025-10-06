@@ -8,16 +8,15 @@ import {
 import { ERR } from "./error.service.js";
 
 export async function signTokensForUser(userId: string, tokenVersion: number) {
-  console.log("signed 1");
   const sessionId = createNewUUID();
   const { token: refreshToken, jti } = await signRefreshToken(
     userId,
     tokenVersion,
     sessionId
   );
-  console.log("signed 2");
+
   const { token: accessToken } = await signAccessToken(userId, tokenVersion);
-  console.log("signed");
+
   await prisma.refreshToken.create({
     data: {
       jti,
@@ -28,7 +27,6 @@ export async function signTokensForUser(userId: string, tokenVersion: number) {
       expiresAt: new Date(Date.now() + 1000 * 60 * 60 * 24 * 30),
     },
   });
-  console.log("error with prisma");
   return { accessToken, refreshToken };
 }
 

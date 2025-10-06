@@ -67,21 +67,19 @@ export async function signIn(req: Request, res: Response, next: NextFunction) {
       return res.status(400).json({ errors: flattenFieldErrors(parsed.error) });
     }
     const { email, password } = parsed.data;
-    console.log("check validation 1");
+
     const user = await UserService.findUserByEmail(email);
-    console.log("check validation 2");
+
     if (!user) throw ERR.INVALID_CREDENTIALS();
     if (!user.emailVerified) throw ERR.UNAUTHORIZED();
-    console.log("check validation 3");
+
     const ok = await Crypto.verifyPassword(password, user.passwordHash);
     if (!ok) throw ERR.INVALID_CREDENTIALS();
-    console.log("check validation 4");
 
     const { accessToken, refreshToken } = await Tokens.signTokensForUser(
       user.id,
       user.tokenVersion
     );
-    console.log("check validation 5");
 
     Cookies.setRefreshCookie(res, refreshToken);
 

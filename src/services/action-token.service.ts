@@ -30,5 +30,6 @@ export async function findActionToken(
       expiresAt: { gt: new Date() },
     },
   });
+
   return row; // caller decides how to update
 }
