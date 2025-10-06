@@ -28,13 +28,13 @@ export function errorHandler(
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   _next: NextFunction
 ) {
-  // 1. checks for known errors
+  // 1. check for known errors
   if (err instanceof Error && ERROR_MAP[err.message]) {
     const mapped = ERROR_MAP[err.message];
     return res.status(mapped.status).json({ error: mapped.message });
   }
 
-  // 2. checks for zod validation
+  // 2. check for zod validation
   if ((err as any).name === "ZodError") {
     return res.status(400).json({ error: "Invalid request", details: err });
   }
