@@ -6,8 +6,8 @@
   "scripts": {
     "build": "tsc",
     "generate": "prisma generate",
-    "start": "cross-env NODE_ENV=production node dist/server.js",
-    "dev": "cross-env NODE_ENV=development npm run build && npm run generate && nodemon dist/server.js"
+    "start": "cross-env NODE_ENV=production node -r dotenv/config dist/server.js",
+    "dev": "cross-env NODE_ENV=development npm run build && npm run generate && nodemon --exec node -r dotenv/config dist/server.js"
   },
   "keywords": [],
   "author": "",

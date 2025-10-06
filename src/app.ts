@@ -8,6 +8,7 @@ import morgan from "morgan";
 import authRouter from "./routes/auth.routes.js";
 import userRouter from "./routes/user.routes.js";
 import { errorHandler } from "./services/error.service.js";
+import "dotenv/config";
 
 //
 const NODE_ENV = process.env.NODE_ENV ?? "development";

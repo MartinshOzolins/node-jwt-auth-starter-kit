@@ -1,22 +1,16 @@
-import http from "http";
-import dotenv from "dotenv";
-
-dotenv.config();
-
 import app from "./app.js";
+import "dotenv/config";
 
-const PORT = Number(4000);
+const PORT = process.env.PORT || 3000;
 
-const server = http.createServer(app);
-
-server.listen(PORT, () => {
-  console.log(`server ready on port ${PORT}`);
+const server = app.listen(PORT, () => {
+  console.log(`Server ready on port ${PORT}`);
 });
 
 // graceful shutdown
 const shutdown = (signal: string) => {
   console.log(`\n${signal} received — closing server...`);
-  server.close((err) => {
+  server.close((err?: Error) => {
     if (err) {
       console.error("Error during server close:", err);
       process.exit(1);
@@ -31,11 +25,9 @@ process.on("SIGTERM", () => shutdown("SIGTERM"));
 
 // catch unhandled rejections/exceptions to avoid silent crashes
 process.on("unhandledRejection", (reason) => {
-  // eslint-disable-next-line no-console
   console.error("Unhandled Rejection:", reason);
 });
 process.on("uncaughtException", (err) => {
-  // eslint-disable-next-line no-console
   console.error("Uncaught Exception:", err);
   shutdown("uncaughtException");
 });

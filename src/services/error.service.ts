@@ -28,6 +28,9 @@ export function errorHandler(
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   _next: NextFunction
 ) {
+  if (process.env.NODE_ENV === "development") {
+    console.error(err);
+  }
   // 1. check for known errors
   if (err instanceof Error && ERROR_MAP[err.message]) {
     const mapped = ERROR_MAP[err.message];

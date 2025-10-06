@@ -1,6 +1,7 @@
 import bcrypt from "bcrypt";
 import { createHash } from "crypto";
 import { v4 as uuidv4 } from "uuid";
+import "dotenv/config";
 
 const saltRounds = process.env.SALT_ROUNDS || 13;
 

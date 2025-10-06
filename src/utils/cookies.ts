@@ -1,4 +1,5 @@
 import { Request, Response } from "express";
+import "dotenv/config";
 
 /**
  * Set the refresh token cookie.

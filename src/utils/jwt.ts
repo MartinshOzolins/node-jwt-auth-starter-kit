@@ -1,6 +1,7 @@
-import jwt, { JwtPayload, SignOptions, Secret } from "jsonwebtoken";
+import jwt, { JwtPayload, SignOptions } from "jsonwebtoken";
 import { randomUUID } from "crypto";
 import { ERR } from "../services/error.service.js";
+import "dotenv/config";
 
 export type AccessTokenType = {
   user_id: string;
@@ -19,10 +20,11 @@ export type RefreshTokenType = {
   exp: number;
 };
 
-const ACCESS_SECRET: Secret = process.env.JWT_ACCESS_SECRET!;
-const REFRESH_SECRET: Secret = process.env.JWT_REFRESH_SECRET!;
-const ACCESS_TTL: number = Number(process.env.JWT_ACCESS_TTL);
-const REFRESH_TTL: number = Number(process.env.JWT_REFRESH_TTL);
+const ACCESS_SECRET = process.env.JWT_ACCESS_SECRET!;
+const REFRESH_SECRET = process.env.JWT_REFRESH_SECRET!;
+
+const ACCESS_TTL: number = Number(process.env.JWT_ACCESS_TTL) ?? 900;
+const REFRESH_TTL: number = Number(process.env.JWT_REFRESH_TTL) ?? 2592000;
 
 /** Create a signed access token  */
 export async function signAccessToken(
