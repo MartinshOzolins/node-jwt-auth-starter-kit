@@ -24,15 +24,17 @@ const REFRESH_SECRET: Secret = process.env.JWT_REFRESH_SECRET!;
 const ACCESS_TTL: number = Number(process.env.JWT_ACCESS_TTL);
 const REFRESH_TTL: number = Number(process.env.JWT_REFRESH_TTL);
 
-/** Creates a signed access token  */
+/** Create a signed access token  */
 export async function signAccessToken(
   userId: string,
   tokenVersion: number
 ): Promise<{ token: string; jti: string }> {
+  // create jti, payload and option
   const jti = randomUUID();
   const payload: JwtPayload = { user_id: userId, token_version: tokenVersion };
   const options: SignOptions = { expiresIn: ACCESS_TTL, jwtid: jti };
 
+  // return the created token
   const token = await new Promise<string>((resolve, reject) => {
     jwt.sign(payload, ACCESS_SECRET, options, (err, encoded) => {
       if (err || !encoded)
@@ -44,7 +46,7 @@ export async function signAccessToken(
   return { token, jti };
 }
 
-/** Verifies an access token  */
+/** Verify an access token  */
 export async function verifyAccessToken(
   token: string
 ): Promise<AccessTokenType> {
@@ -65,7 +67,7 @@ export async function verifyAccessToken(
   };
 }
 
-/** Creates a signed refresh token  */
+/** Create a signed refresh token  */
 export async function signRefreshToken(
   userId: string,
   tokenVersion: number,

@@ -1,19 +1,19 @@
 import { Request, Response } from "express";
 
 /**
- * Sets the refresh token cookie.
+ * Set the refresh token cookie.
  */
 export function setRefreshCookie(res: Response, token: string) {
   res.cookie("rt", token, {
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production", // production only
+    secure: process.env.NODE_ENV === "production",
     path: "/auth",
     maxAge: daysToMs(Number(process.env.REFRESH_COOKIE_DAYS ?? 30)), // default 30 days
   });
 }
 
 /**
- * Clears the refresh token cookie.
+ * Clear the refresh token cookie.
  */
 export function clearRefreshCookie(res: Response) {
   res.clearCookie("rt", {
@@ -24,8 +24,8 @@ export function clearRefreshCookie(res: Response) {
 }
 
 /**
- * Gets the refresh token value from cookies.
- * Returns `null` if missing.
+ * Get the refresh token value from cookies.
+ * Return `null` if missing.
  */
 export function getRefreshCookie(req: Request): string | null {
   if (!req.cookies) return null;

@@ -35,7 +35,7 @@ const router = Router();
  */
 router.post("/sign-up", async (req, res, next) => {
   try {
-    // 1) validates body
+    // 1) validate body
     const { email, password } = z
       .object({
         email: z.email(),
@@ -43,20 +43,22 @@ router.post("/sign-up", async (req, res, next) => {
       })
       .parse(req.body);
 
-    // 2) ensures email not taken
+    // 2) ensure email
     const exists = await findUserByEmail(email);
     if (exists) {
       return res.status(400).json({ message: "Email already registered" });
     }
 
-    // 3) creates user
+    // 3) create user
     const user = await createUser(
       email.toLowerCase(),
       await hashPassword(password)
     );
 
-    // 4) creates email verification token
+    // 4) create email verification token
     const rawToken = createNewUUID();
+
+    // 5) store token into database (for later verification)
     await prisma.actionToken.create({
       data: {
         userId: user.id,
@@ -66,7 +68,7 @@ router.post("/sign-up", async (req, res, next) => {
       },
     });
 
-    // 5) sends verification email (uses raw token)
+    // 5) send verification email (uses raw token)
     await sendVerifyEmail({ to: user.email, token: rawToken });
 
     // 6) success message with note to verify email
@@ -83,7 +85,7 @@ router.post("/sign-up", async (req, res, next) => {
  */
 router.post("/sign-in", async (req, res, next) => {
   try {
-    // 1) validates body
+    // 1) validate body
     const { email, password } = z
       .object({
         email: z.email(),
@@ -91,23 +93,24 @@ router.post("/sign-in", async (req, res, next) => {
       })
       .parse(req.body);
 
-    // 2) retrieves user
+    // 2) retrieve user
     const user = await findUserByEmail(email);
     if (!user) throw ERR.INVALID_CREDENTIALS();
 
+    // 3) check email verification
     if (!user.emailVerified) throw ERR.UNAUTHORIZED();
 
-    // 3) compares passwords
+    // 4) compare passwords
     const ok = await verifyPassword(password, user.passwordHash);
     if (!ok) throw ERR.INVALID_CREDENTIALS();
 
-    // 4) signs access token (does not set it anywhere)
+    // 5) sign access token (does not set it anywhere)
     const { token: accessToken } = await signAccessToken(
       user.id,
       user.tokenVersion
     );
 
-    // 5) signs refresh token
+    // 6) sign refresh token
     const sessionId = createNewUUID(); // session to identify each device
     const { token: refreshToken, jti } = await signRefreshToken(
       user.id,
@@ -115,7 +118,7 @@ router.post("/sign-in", async (req, res, next) => {
       sessionId
     );
 
-    // 6) adds refesh token data into database
+    // 7) add refesh token data into database
     await prisma.refreshToken.create({
       data: {
         jti,
@@ -127,10 +130,10 @@ router.post("/sign-in", async (req, res, next) => {
       },
     });
 
-    // 7) attaches refresh token as a cookie
+    // 8) attach refresh token as a cookie
     setRefreshCookie(res, refreshToken);
 
-    // 8) returns access token and a user
+    // 9) return access token and a user
     return res.json({
       accessToken,
       user: {
@@ -146,31 +149,31 @@ router.post("/sign-in", async (req, res, next) => {
 
 /**
  * POST /auth/refresh
- * - verifies refresh cookie
- * - checks DB row (valid, not expired, version match)
+ * - verify refresh cookie
+ * - check DB row (valid, not expired, version match)
  * - rotates: invalidate old row, insert new row (same sessionId, new jti)
- * - returns new access + sets new refresh cookie
+ * - return new access + sets new refresh cookie
  */
 router.post("/refresh", async (req, res, next) => {
-  // 1) retrieves refresh token from cookies
+  // 1) retrieve refresh token from cookies
   const rt = getRefreshCookie(req);
   if (!rt) throw ERR.INVALID_REFRESH();
 
   try {
-    // 2) verifies refresh token and returns payload
+    // 2) verify refresh token and returns payload
     const payload = await verifyRefreshToken(rt);
 
-    // 3) retries refresh token from database
+    // 3) retrieve refresh token from database
     const row = await prisma.refreshToken.findUnique({
       where: { jti: payload.jti },
     });
 
-    // 4) verifies if refresh token from db is still valid
+    // 4) verify if refresh token from db is still valid
     if (!row || row.revoked || row.expiresAt <= new Date()) {
       throw ERR.INVALID_REFRESH();
     }
 
-    // 5) finds user and verifies token version
+    // 5) find user and verify token version
     const user = await prisma.user.findUnique({
       where: { id: payload.user_id },
     });
@@ -178,9 +181,8 @@ router.post("/refresh", async (req, res, next) => {
       throw ERR.INVALID_REFRESH();
     }
 
-    // 6) rotates refresh tokens automically
-
-    // 7) creates new refresh and access tokens (do not change versions as other sessions may still be valid)
+    // rotate refresh tokens automically
+    // 6) create new refresh and access tokens (do not change versions as other sessions may still be valid)
     const { token: newRefreshToken, jti: newJti } = await signRefreshToken(
       user.id,
       user.tokenVersion,
@@ -191,18 +193,18 @@ router.post("/refresh", async (req, res, next) => {
       user.tokenVersion
     );
 
-    // 8) revokes the previous refresh token
+    // 7) revoke the previous refresh token
     await prisma.$transaction([
       prisma.refreshToken.update({
         where: { jti: row.jti },
         data: { revoked: true, revokedAt: new Date(), lastUsedAt: new Date() },
       }),
-      // 9) inserts the new refresh token
+      // 8) insert the new refresh token
       prisma.refreshToken.create({
         data: {
           jti: newJti,
           userId: user.id,
-          sessionId: row.sessionId,
+          sessionId: row.sessionId, // reuse the same sessionId
           tokenVersion: user.tokenVersion,
           revoked: false,
           expiresAt: new Date(Date.now() + 1000 * 60 * 60 * 24 * 30),
@@ -210,10 +212,10 @@ router.post("/refresh", async (req, res, next) => {
       }),
     ]);
 
-    // 10) attaches new refresh token
+    // 9) attach new refresh token
     setRefreshCookie(res, newRefreshToken);
 
-    // 11) returns new access token
+    // 10) return new access token
     return res.json({ accessToken: newAccessToken });
   } catch (err) {
     next(err);
@@ -226,11 +228,11 @@ router.post("/refresh", async (req, res, next) => {
  * - clear cookie
  */
 router.post("/logout", async (req, res) => {
-  // 1) retrieves refresh token
+  // 1) retrieve refresh token
   const rt = getRefreshCookie(req);
 
   if (rt) {
-    // 2) if exists, verifies and revokes it
+    // 2) if exists, verify and revoke it
     try {
       const { user_id, session_id } = await verifyRefreshToken(rt);
       await prisma.refreshToken.updateMany({
@@ -239,7 +241,7 @@ router.post("/logout", async (req, res) => {
       });
     } catch {}
   }
-  // 2) clears cookie from refresh token (even if in invalid)
+  // 2) clear cookie from refresh token (even if in invalid)
   clearRefreshCookie(res);
 
   return res.json({ ok: true });
@@ -253,11 +255,11 @@ router.post("/logout", async (req, res) => {
 router.post("/logout-all", async (req, res, next) => {
   let userId: string | null = null;
 
-  // 3) checks if access token exists
+  // 1) check if access token exists
   const auth = req.headers.authorization;
   if (auth?.startsWith("Bearer ")) {
     try {
-      // 4) verifies access token
+      // 2) verify access token
       const dec = await verifyAccessToken(auth.slice(7));
       userId = dec.user_id;
     } catch (err) {
@@ -266,7 +268,7 @@ router.post("/logout-all", async (req, res, next) => {
   }
   // 5) fallback: refresh cookie validation
   if (!userId) {
-    // 6) retrieves refresh cookie
+    // 6) retrieve refresh cookie
     const rt = getRefreshCookie(req);
     // 7) it authorised and refresh token is valid -> continue
     if (rt) {
@@ -281,11 +283,11 @@ router.post("/logout-all", async (req, res, next) => {
   // 8) if unauthorised, cannot logout-all
   if (!userId) throw ERR.UNAUTHORIZED();
 
-  // 9) increments token version + revokes all refresh tokens
+  // 9) increment token version + revoke all refresh tokens
   await prisma.$transaction([
     prisma.user.update({
       where: { id: userId },
-      data: { tokenVersion: { increment: 1 } },
+      data: { tokenVersion: { increment: 1 } }, // will not allow using old access/refresh tokens
     }),
     prisma.refreshToken.updateMany({
       where: { userId, revoked: false },
@@ -293,7 +295,7 @@ router.post("/logout-all", async (req, res, next) => {
     }),
   ]);
 
-  // clears refresh cookie on this device
+  // clear refresh cookie on this device
   clearRefreshCookie(res);
   return res.json({ ok: true });
 });
@@ -314,7 +316,7 @@ router.post("/verify-email", async (req, res) => {
 
   const { token } = result.data;
 
-  // 2) compares presented token with database token (hashes token to compare against db + checks expiration date)
+  // 2) compare presented token with database token (hashes token to compare against db + checks expiration date)
   const row = await prisma.actionToken.findFirst({
     where: {
       kind: "EMAIL_VERIFICATION",
@@ -324,23 +326,23 @@ router.post("/verify-email", async (req, res) => {
     },
   });
 
-  // 3) if no such token exists, returns error
+  // 3) if no such token exists, return error
   if (!row) throw ERR.INVALID_TOKEN();
 
-  // 4) otherwise, updates token as used
+  // 4) otherwise, update token as used
   await prisma.$transaction([
     prisma.actionToken.update({
       where: { id: row.id },
       data: { usedAt: new Date() },
     }),
-    // 5) updates user to be verified + increments token
+    // 5) update user to be verified + increment token
     prisma.user.update({
       where: { id: row.userId },
       data: { emailVerified: true, tokenVersion: { increment: 1 } },
     }),
   ]);
 
-  // 6) returns success message
+  // 6) return success message
   return res.json({ message: "Email verified. Please sign-in." });
 });
 
@@ -350,30 +352,30 @@ router.post("/verify-email", async (req, res) => {
  * - no auth required
  */
 router.post("/resend-verification", async (req, res) => {
-  // 1) validates email
+  // 1) validate email
   const { email } = z
     .object({ email: z.email() })
     .parse({ email: req.body.email });
 
-  // 2) finds user with such email
+  // 2) find user with such email
   const user = await findUserByEmail(email.toLowerCase());
 
-  // 3) if no user, returns success anyway (avoid leaking valid accounts)
+  // 3) if no user, return success anyway (avoid leaking valid accounts)
   if (!user) {
     return res.json({
       message: "If that account exists, a verification email has been sent.",
     });
   }
 
-  // 4) returns that already verified
+  // 4) return that already verified
   if (user.emailVerified) {
     return res.status(400).json({ message: "Already verified" });
   }
 
-  // 5) if not verified, creates a new raw token
+  // 5) if not verified, create a new raw token
   const raw = createNewUUID();
 
-  // 6) inserts hashed raw token into database and sets expiration in 24h
+  // 6) insert hashed raw token into database and set expiration in 24h
   await prisma.actionToken.create({
     data: {
       userId: user.id,
@@ -383,10 +385,10 @@ router.post("/resend-verification", async (req, res) => {
     },
   });
 
-  // 7) sends verification email with the raw token (will be hashed and checked when returned)
+  // 7) send verification email with the raw token (will be hashed and checked when returned)
   await sendVerifyEmail({ to: user.email, token: raw });
 
-  // 8) returns success message
+  // 8) return success message
   return res.json({
     message: "If that account exists, a verification email has been sent.",
   });
@@ -398,20 +400,20 @@ router.post("/resend-verification", async (req, res) => {
  * Always 200 to avoid account enumeration
  */
 router.post("/password-reset/request", async (req, res) => {
-  // 1) validates email
+  // 1) validate email
   const { email } = z
     .object({
       email: z.email(),
     })
     .parse(req.body);
 
-  // 2) finds user
+  // 2) find user
   const user = await findUserByEmail(email.toLowerCase());
 
   if (user) {
-    // 3) if user exist, creates a raw token
+    // 3) if user exist, create a raw token
     const raw = createNewUUID();
-    // 4) inserts action token into database
+    // 4) insert action token into database
     await prisma.actionToken.create({
       data: {
         userId: user.id,
@@ -420,10 +422,10 @@ router.post("/password-reset/request", async (req, res) => {
         expiresAt: new Date(Date.now() + 1000 * 60 * 15), // 15m
       },
     });
-    // 5) sends password reset email with raw token (when returned, we hash it and compare against db hased token)
+    // 5) send password reset email with raw token (when returned, we hash it and compare against db hased token)
     await sendPasswordResetEmail({ to: user.email, token: raw });
   }
-  // 6) returns success message
+  // 6) return success message
   return res.json({ message: "If that email exists, we sent a reset link." });
 });
 
@@ -432,13 +434,13 @@ router.post("/password-reset/request", async (req, res) => {
  * body: { token }
  */
 router.post("/password-reset/verify", async (req, res) => {
-  // 1) retrieves token
+  // 1) retrieve token
   const result = z
     .object({ token: z.string().min(10) })
     .safeParse({ token: req.body.token ?? req.query.token });
   if (!result.success) throw ERR.INVALID_TOKEN();
 
-  // 2) hashes token and compares against database
+  // 2) hashe token and compares against database
   const token = result.data.token;
   const row = await prisma.actionToken.findFirst({
     where: {
@@ -450,21 +452,21 @@ router.post("/password-reset/verify", async (req, res) => {
     select: { id: true, userId: true },
   });
 
-  // 3) if such token doesn't exist, returns an error
+  // 3) if such token doesn't exist, return an error
   if (!row) throw ERR.INVALID_TOKEN();
 
-  // 4) creates new raw token
+  // 4) create new raw token
   const confirmRaw = createNewUUID();
   const CONFIRM_TTL_MS = 1000 * 60 * 10; // 10 minutes
 
-  // 5) revokes prev token + inserts a new token for later confirmation when sends an updated password
+  // 5) revoke prev token + inserts a new token for later confirmation when sends an updated password
   await prisma.$transaction([
-    // revokes prev token
+    // revoke prev token
     prisma.actionToken.update({
       where: { id: row.id },
       data: { usedAt: new Date() },
     }),
-    // creates a new token
+    // create a new token
     prisma.actionToken.create({
       data: {
         userId: row.userId,
@@ -475,7 +477,7 @@ router.post("/password-reset/verify", async (req, res) => {
     }),
   ]);
 
-  // 6) returns success message and raw token
+  // 6) return success message and raw token
   return res.json({
     ok: true,
     token: confirmRaw,
@@ -485,10 +487,10 @@ router.post("/password-reset/verify", async (req, res) => {
 /**
  * POST /auth/password-reset/confirm
  * body: { token, newPassword }
- * Consumes token, updates password, bumps tokenVersion, revokes all refresh tokens
+ * Consume token, update password, bump tokenVersion, revoke all refresh tokens
  */
 router.post("/password-reset/confirm", async (req, res, next) => {
-  // 1) retrieves token + new password
+  // 1) retrieve token + new password
   try {
     const result = z
       .object({
@@ -499,7 +501,7 @@ router.post("/password-reset/confirm", async (req, res, next) => {
 
     if (!result.success) throw ERR.INVALID_TOKEN();
 
-    // 2) validates the CONFIRM token
+    // 2) validate the CONFIRM token
     const { token, newPassword } = result.data;
     const row = await prisma.actionToken.findFirst({
       where: {
@@ -510,32 +512,32 @@ router.post("/password-reset/confirm", async (req, res, next) => {
       },
       select: { id: true, userId: true },
     });
-    // 3) if no such token, returns error
+    // 3) if no such token, return error
     if (!row) throw ERR.INVALID_TOKEN();
 
-    // 4) hashes new password
+    // 4) hash new password
     const newHash = await hashPassword(newPassword);
 
     await prisma.$transaction([
-      // 5) revokes confirm token as used
+      // 5) revoke confirm token as used
       prisma.actionToken.update({
         where: { id: row.id },
         data: { usedAt: new Date() },
       }),
-      // 6) updates token version + 1
+      // 6) update user token version + 1
       prisma.user.update({
         where: { id: row.userId },
         data: { passwordHash: newHash, tokenVersion: { increment: 1 } },
       }),
-      // 7) revokes all session
+      // 7) revoke all session
       prisma.refreshToken.updateMany({
         where: { userId: row.userId, revoked: false },
         data: { revoked: true, revokedAt: new Date() },
       }),
     ]);
-    // 8) clears the refresh cookie on this device
+    // 8) clear the refresh cookie on this device
     clearRefreshCookie(res);
-    return res.json({ message: "Password updated" });
+    return res.json({ message: "Password updated. Please sign-in" });
   } catch (err) {
     next(err);
   }
